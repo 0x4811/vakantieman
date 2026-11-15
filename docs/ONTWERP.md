@@ -236,3 +236,16 @@ De limieten en gegevens hierboven zijn gelezen op 12 november 2026 en kunnen wij
 - Claude API, coördinaten in afbeeldingen: https://platform.claude.com/docs/en/build-with-claude/vision-coordinates
 - Claude API, gestructureerde uitvoer: https://platform.claude.com/docs/en/build-with-claude/structured-outputs
 - OpenFreeMap: https://openfreemap.org
+
+
+## 15. Zoals gebouwd (afwijkingen van dit ontwerp)
+
+- **Twee Workers** in plaats van één: `vakantieman` (achter Cloudflare Access) en `vakantieman-vote` (openbaar). Access op een workers.dev-adres dekt de hele Worker, en het publiek mag niet inloggen. De stem-Worker heeft alleen een Durable Object-binding (via `script_name`), geen D1 of R2.
+- **Analyse via de browser:** de browser stuurt de afbeelding als base64 mee, zodat de Worker niets hoeft te coderen (CPU-limiet gratis plan). Het ruwe modelantwoord wordt nooit bewaard; eerst volgt beperking tot het detailniveau.
+- **Goedgekeurde analyse:** een sessie gebruikt alleen goedgekeurde analyses. Verborgen aanwijzingen en kandidaten komen niet in het sessiescript.
+- **Sessiekamer:** één Durable Object per code. Stemmen staan in SQLite van de kamer en worden bij afsluiten gewist; alleen een samenvatting gaat naar D1. Meldingen over nieuwe stemmen worden per 700 ms gebundeld.
+- **Routes:** `/api/photos`, `/api/analyses`, `/api/sessions` (incl. `/refresh`, `/script`), `/api/admin/wipe`, `/ws/:code` (Origin-controle), op de stem-Worker `/v/:code`, `/api/vote/:code` en `/api/vote/:code/status`.
+- **Offline-speler:** eigen SVG-kaart (Mercator) in plaats van MapLibre, zodat het één los bestand blijft; geen live stemmen.
+- **Opruiming:** dagelijkse cron sluit live sessies na 12 uur en niet gestarte sessies na 14 dagen. "Alles wissen" vraagt de tekst ALLES WISSEN.
+- **Workers AI:** de provider ondersteunt de binding, maar `ai` staat bewust niet in `wrangler.jsonc`: lokaal vraagt die binding om inloggen. Voeg `"ai": { "binding": "AI" }` toe als je Workers AI wilt gebruiken.
+- **Tags:** niet te pushen vanuit de ontwikkelomgeving; zie CHANGELOG.md.
