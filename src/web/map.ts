@@ -8,36 +8,13 @@ import "./maplibre-worker";
 import type { Feature, FeatureCollection } from "geojson";
 import { circlePolygon } from "../shared/geo";
 import { landGeoJson } from "./land";
+import type { AreaItem, LinkItem, MapView, PinItem } from "./map-types";
+
+export { COLORS } from "./map-types";
+export type { AreaItem, LinkItem, MapView, PinItem, PinKind } from "./map-types";
 
 const ONLINE_STYLE = "https://tiles.openfreemap.org/styles/positron";
 const FALLBACK_AFTER_MS = 6000;
-
-export interface AreaItem {
-  id: string;
-  lat: number;
-  lon: number;
-  radius_km: number;
-  color: string;
-  opacity: number;
-}
-
-export type PinKind = "truth" | "tool" | "audience" | "candidate" | "pick";
-
-export interface PinItem {
-  id: string;
-  lat: number;
-  lon: number;
-  label?: string;
-  kind: PinKind;
-}
-
-export interface LinkItem {
-  id: string;
-  from: [number, number]; // [lon, lat]
-  to: [number, number];
-  label: string;
-  color: string;
-}
 
 export interface DemoMapOptions {
   center?: [number, number]; // [lon, lat]
@@ -62,7 +39,7 @@ function offlineStyle(): StyleSpecification {
   };
 }
 
-export class DemoMap {
+export class DemoMap implements MapView {
   readonly map: MlMap;
   private ready: Promise<void>;
   private pins = new Map<string, Marker>();
@@ -291,9 +268,3 @@ export class DemoMap {
   }
 }
 
-export const COLORS = {
-  top: "#ff5a5f",
-  other: "#ffc845",
-  truth: "#3dd68c",
-  audience: "#4aa8ff"
-};

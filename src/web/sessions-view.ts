@@ -3,6 +3,8 @@
 import { api } from "./api";
 import { formatDateTime, h, mount, openModal, toast } from "./dom";
 import { qrDataUrl } from "./qr";
+import { photoUrl } from "./api";
+import { blobToDataUrl, buildOfflineHtml } from "./offline-pack";
 import { formatKm } from "../shared/geo";
 import type { AnalysisDto, PhotoDto, SessionDto } from "../shared/types";
 
@@ -97,6 +99,7 @@ function sessionCard(s: SessionDto, photos: PhotoDto[], reload: () => Promise<vo
       s.state !== "ended" ? h("a", { class: "btn", href: present, target: "_blank", rel: "noopener" }, "Presentatie") : null,
       s.state !== "ended" ? h("a", { class: "btn", href: control, target: "_blank", rel: "noopener" }, "Bediening") : null,
       s.state !== "ended" ? h("button", { class: "btn", onclick: () => void showQr(control, s.code) }, "QR bediening") : null,
+      s.state !== "ended" ? h("button", { class: "btn", onclick: () => void exportPack(s) }, "Offline-pakket") : null,
       s.state !== "ended"
         ? h("button", { class: "btn", onclick: () => void refresh(s, reload) }, "Vernieuwen")
         : null,
@@ -139,4 +142,25 @@ async function showQr(url: string, code: string): Promise<void> {
       h("button", { class: "btn", onclick: () => close() }, "Sluiten")
     ])
   );
+}
+
+async function exportPack(s: SessionDto): Promise<void> {
+  try {
+    toast("Offline-pakket wordt gemaakt…", "ok");
+    const { script } = await api<{ script: { masked: unknown } }>(`/api/sessions/${s.id}/script`);
+    const fetchPhoto = async (variant: "original" | "masked"): Promise<string> => blobToDataUrl(await (await fetch(photoUrl(s.photo_id, variant))).blob());
+    const original = await fetchPhoto("original");
+    const masked = script.masked ? await fetchPhoto("masked") : null;
+    const template = await (await fetch("/offline-player")).text();
+    const html = buildOfflineHtml(template, { script, photos: { original, masked } });
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `vakantieman-${s.code}.html`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    toast("Offline-pakket gedownload. Het bevat de foto: bewaar het zorgvuldig.", "ok", 8000);
+  } catch (error) {
+    toast((error as Error).message, "error");
+  }
 }

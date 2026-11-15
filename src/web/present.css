@@ -62,3 +62,8 @@ body.present { overflow: hidden; background: #05070a; }
   .stage-main { grid-template-columns: 1fr; }
   .stage-map { min-height: 320px; }
 }
+
+.offline-bar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 10px; z-index: 40; opacity: 0; transition: opacity .3s; pointer-events: none; }
+.offline-bar.is-visible { opacity: 1; pointer-events: auto; }
+.offline-bar .btn { min-width: 64px; min-height: 48px; }
+.lead-small { font-size: 18px; color: var(--muted); }

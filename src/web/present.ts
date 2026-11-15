@@ -6,6 +6,7 @@ import type { SessionScript, SessionState } from "../shared/session";
 import { $, h, mount } from "./dom";
 import { codeFromPath, connectLive } from "./live";
 import { photoUrl } from "./api";
+import { DemoMap } from "./map";
 import { Stage } from "./stage";
 
 const app = $("#app");
@@ -27,7 +28,10 @@ const live = connectLive(code, "present", {
     switch (message.t) {
       case "snapshot": {
         photoId = message.script.photo.id;
-        const options = { photoSrc: (variant: "original" | "masked") => photoUrl(photoId, variant) };
+        const options = {
+          photoSrc: (variant: "original" | "masked") => photoUrl(photoId, variant),
+          createMap: (el: HTMLElement) => new DemoMap(el, { center: [10, 30], zoom: 1.4, interactive: false })
+        };
         if (!stage) {
           stage = new Stage(app, message.script, message.state, options);
         } else if (current?.script.photo.id !== photoId || JSON.stringify(current.script) !== JSON.stringify(message.script)) {

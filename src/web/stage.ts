@@ -14,14 +14,16 @@ import {
 } from "../shared/session";
 import { CLUE_CATEGORY_LABELS, type Candidate } from "../shared/types";
 import { h, mount } from "./dom";
-import { COLORS, DemoMap, type AreaItem, type LinkItem, type PinItem } from "./map";
+import { COLORS, type AreaItem, type LinkItem, type MapView, type PinItem } from "./map-types";
 import { photoStage, type PhotoStage } from "./photo-view";
 import { qrDataUrl } from "./qr";
 
 export interface StageOptions {
   photoSrc: (variant: "original" | "masked") => string;
-  /** Ingebouwde wereldkaart gebruiken zonder te wachten op tegels (offline-speler). */
-  offlineMap?: boolean;
+  /** Maakt de kaart (MapLibre online, SVG offline). */
+  createMap: (container: HTMLElement) => MapView;
+  /** Offline-speler: geen live stemmen. */
+  offline?: boolean;
 }
 
 const label = (c: Candidate): string => placeLabel(c) || "onbekend";
@@ -35,7 +37,7 @@ export class Stage {
   private results: RevealResults | null = null;
 
   private root: HTMLElement;
-  private map!: DemoMap;
+  private map!: MapView;
   private original!: PhotoStage;
   private masked: PhotoStage | null = null;
 
@@ -88,7 +90,7 @@ export class Stage {
     e.stage.append(e.intro, e.main, e.badge, e.code, e.blank);
     mount(this.root, e.stage);
 
-    this.map = new DemoMap(e.mapBox, { center: [10, 30], zoom: 1.4, interactive: false, forceOffline: this.options.offlineMap });
+    this.map = this.options.createMap(e.mapBox);
     e.code.textContent = this.script.code;
   }
 
@@ -225,6 +227,18 @@ export class Stage {
   }
 
   private renderGuessingSide(): void {
+    if (this.options.offline) {
+      mount(
+        this.el.side,
+        h("div", { class: "vote-card vote-card--offline" }, [
+          h("div", { class: "vote-info" }, [
+            h("div", { class: "vote-open" }, "Raadronde"),
+            h("p", { class: "lead-small" }, "Geen internet nodig: laat het publiek hardop raden of met handopsteken.")
+          ])
+        ])
+      );
+      return;
+    }
     const url = this.script.vote_url;
     const qrImg = h("img", { class: "qr", alt: "QR-code om mee te doen", width: 220, height: 220 });
     if (url) {

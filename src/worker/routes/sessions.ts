@@ -86,6 +86,14 @@ sessions.post("/:id/refresh", async (c) => {
   return error ? c.json({ error }, 500) : c.json({ ok: true });
 });
 
+// Het script (zonder stemmen) voor het offline-pakket; de browser voegt de foto's toe.
+sessions.get("/:id/script", async (c) => {
+  const row = await getSession(c.env.DB, c.req.param("id"));
+  if (!row) return c.json({ error: "Sessie niet gevonden." }, 404);
+  const built = await buildScript(c.env, row);
+  return built.ok ? c.json({ script: built.script, has_masked: built.script.masked !== null }) : c.json({ error: built.error }, 409);
+});
+
 sessions.delete("/:id", async (c) => {
   const row = await getSession(c.env.DB, c.req.param("id"));
   if (!row) return c.json({ error: "Sessie niet gevonden." }, 404);
