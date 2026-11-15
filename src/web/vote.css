@@ -1,0 +1,10 @@
+/* Stempagina (telefoon) */
+body.vote { overflow: hidden; }
+#app { height: 100dvh; display: grid; grid-template-rows: auto 1fr auto; }
+.vote-head { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; }
+.vote-head h1 { font-size: 20px; }
+.vote-code { color: var(--accent-2); letter-spacing: .18em; }
+.vote-map { min-height: 0; background: #cfe3f1; }
+.vote-bar { padding: 12px 16px calc(env(safe-area-inset-bottom) + 14px); display: grid; gap: 10px; background: var(--surface); border-top: 1px solid var(--line); }
+.vote-msg { font-size: 16px; }
+.vote-send { min-height: 54px; font-size: 18px; border-radius: 14px; }

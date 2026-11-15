@@ -167,6 +167,8 @@ input[type="file"] { color: var(--muted); }
 }
 .pin--truth { --pin: var(--ok); }
 .pin--truth span { top: auto; bottom: 14px; }
+.pin--tool span { left: 16px; top: -10px; transform: none; }
+.pin--audience span { left: auto; right: 16px; top: -10px; transform: none; }
 .pin--tool { --pin: var(--accent); }
 .pin--audience { --pin: var(--info); }
 .pin--candidate { --pin: var(--accent-2); }

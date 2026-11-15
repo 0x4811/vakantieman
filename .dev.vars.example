@@ -18,3 +18,4 @@ VISION_PROVIDER=mock
 # Workers AI via REST (alleen voor het bench-script; in de Worker gebruikt het de AI-binding)
 # CF_ACCOUNT_ID=
 # CF_API_TOKEN=
+PUBLIC_VOTE_URL=http://localhost:8788

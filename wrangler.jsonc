@@ -38,7 +38,9 @@
     "PRIVATE_PROVIDERS": "claude,mock",
     // Pas invullen na het inrichten van Cloudflare Access (zie docs/INRICHTING.md)
     "ACCESS_TEAM_DOMAIN": "",
-    "ACCESS_AUD": ""
+    "ACCESS_AUD": "",
+    // Adres van de publieke stem-Worker, bijvoorbeeld https://vakantieman-vote.<subdomein>.workers.dev
+    "PUBLIC_VOTE_URL": ""
   },
   "observability": { "enabled": true }
 }

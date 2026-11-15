@@ -36,6 +36,12 @@ async function api<T = any>(path: string, init: RequestInit & { headers?: Record
   return { status: res.status, body };
 }
 
+
+async function vote(code: string, body: unknown): Promise<{ status: number; body: any }> {
+  const res = await fetch(`${VOTE}/api/vote/${code}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return { status: res.status, body: await res.json().catch(() => ({})) };
+}
+
 const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
 const jpegBytes = makeJpeg({ width: 1200, height: 800 });
 const IMAGE_B64 = b64(new Uint8Array(900).fill(7)); // lang genoeg voor de base64-controle (geen echt beeld nodig voor de mock)
@@ -226,6 +232,16 @@ async function main(): Promise<void> {
     ws.close();
   });
 
+  await step("stem-Worker: stemmen zijn dicht voor de start, onbekende codes geven 404", async () => {
+    const early = await vote(code, { token: "abcdefghijklmnop1", lat: 51, lon: 4 });
+    assert.equal(early.status, 409);
+    assert.equal((await fetch(`${VOTE}/api/vote/ZZZZZ/status`)).status, 404);
+    assert.equal((await fetch(`${VOTE}/api/vote/abc/status`)).status, 404);
+    const status: any = await (await fetch(`${VOTE}/api/vote/${code}/status`)).json();
+    assert.deepEqual(Object.keys(status).sort(), ["count", "ended", "open", "started"]);
+    assert.equal(status.open, false);
+  });
+
   await step("bediening: Volgende opent de raadronde en ongeldige acties worden geweigerd", async () => {
     const ws = new WebSocket(`${BASE.replace("http", "ws")}/ws/${code}?role=control`);
     const messages: any[] = [];
@@ -240,6 +256,32 @@ async function main(): Promise<void> {
     await until(() => messages.some((m) => m.t === "state" && m.state.phase === "guessing" && m.state.votesOpen));
     ws.send(JSON.stringify({ t: "action", action: { type: "bogus" } }));
     await until(() => messages.some((m) => m.t === "error"));
+    ws.close();
+  });
+
+  await step("stem-Worker: geldige stem, ongeldige invoer, wijzigen en limiet", async () => {
+    const t = "tokentokentoken01";
+    assert.equal((await vote(code, { token: t, lat: 51.2, lon: 4.4 })).status, 200);
+    assert.equal((await vote(code, { token: "kort", lat: 51, lon: 4 })).status, 400);
+    assert.equal((await vote(code, { token: "tokentokentoken02", lat: 95, lon: 4 })).status, 400);
+    assert.equal((await vote(code, { token: "tokentokentoken02", lat: "51", lon: 4 })).status, 400);
+    for (let i = 0; i < 5; i++) assert.equal((await vote(code, { token: t, lat: 52 + i / 10, lon: 5 })).status, 200);
+    assert.equal((await vote(code, { token: t, lat: 40, lon: 5 })).status, 429);
+    const status: any = await (await fetch(`${VOTE}/api/vote/${code}/status`)).json();
+    assert.equal(status.open, true);
+    assert.equal(status.count, 1, "een token telt één keer");
+  });
+
+  await step("stemmen komen gebundeld bij het scherm binnen en worden niet gelekt in de status", async () => {
+    const ws = new WebSocket(`${BASE.replace("http", "ws")}/ws/${code}?role=present`);
+    const messages: any[] = [];
+    ws.onmessage = (e) => messages.push(JSON.parse(String(e.data)));
+    await new Promise((r) => (ws.onopen = r));
+    for (let i = 0; i < 20; i++) await vote(code, { token: `bulkbulkbulk${String(i).padStart(4, "0")}`, lat: 48 + i / 10, lon: 2 });
+    for (let i = 0; i < 60 && !messages.some((m) => m.t === "votes" && m.count === 21); i++) await new Promise((r) => setTimeout(r, 100));
+    const votes = messages.filter((m) => m.t === "votes");
+    assert.ok(votes.some((m) => m.count === 21), "geen bundelbericht met 21 stemmen");
+    assert.ok(votes.length < 20, `te veel afzonderlijke berichten: ${votes.length}`);
     ws.close();
   });
 

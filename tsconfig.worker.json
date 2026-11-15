@@ -5,5 +5,5 @@
     "types": ["@cloudflare/workers-types"]
   },
   "files": [],
-  "include": ["src/worker/**/*.ts", "src/shared/**/*.ts"]
+  "include": ["src/worker/**/*.ts", "src/vote/**/*.ts", "src/shared/**/*.ts"]
 }

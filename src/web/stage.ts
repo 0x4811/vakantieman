@@ -324,7 +324,9 @@ export class Stage {
     }
     this.map.setPins(pins);
     this.map.setLinks(links);
-    this.fit(`reveal:${bounds.length}:${r?.votes ?? 0}`, () => this.map.fit(bounds, { padding: 110, maxZoom: 11, duration: 1400 }));
+    // Het hele publiek komt in beeld, zodat de verspreiding van de gokken te zien is.
+    const all = bounds.concat(this.votes.slice(0, 600));
+    this.fit(`reveal:${bounds.length}:${r?.votes ?? 0}`, () => this.map.fit(all, { padding: 110, maxZoom: 11, duration: 1400 }));
 
     mount(
       this.el.caption,
