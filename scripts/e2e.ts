@@ -295,6 +295,10 @@ async function main(): Promise<void> {
     assert.equal((await api(`/api/sessions/${sessionId}/refresh?force=1`, { method: "POST" })).status, 200);
   });
 
+  await step("alles wissen vraagt een exacte bevestiging", async () => {
+    assert.equal((await api("/api/admin/wipe", { method: "POST", body: JSON.stringify({ confirm: "nee" }) })).status, 400);
+  });
+
   await step("verwijderen van de sessie", async () => {
     assert.equal((await api(`/api/sessions/${sessionId}`, { method: "DELETE" })).status, 200);
     assert.equal((await api(`/api/sessions/${sessionId}`)).status, 404);

@@ -5,10 +5,12 @@
 import { Hono } from "hono";
 import { listProviders } from "./vision";
 import { authenticate } from "./auth";
-import type { AppContext } from "./env";
+import type { AppContext, Env } from "./env";
 import { PAGE_CSP, SECURITY_HEADERS, withHeaders } from "./http";
 import { analyses } from "./routes/analyses";
 import { photos } from "./routes/photos";
+import { admin } from "./routes/admin";
+import { endStaleSessions } from "./cleanup";
 import { connectSocket, sessions } from "./routes/sessions";
 import type { ProviderId, ConfigDto } from "../shared/types";
 import type { AiBinding } from "./vision/types";
@@ -93,6 +95,7 @@ app.get("/ws/:code", async (c) => {
 
 app.route("/api/photos", photos);
 app.route("/api/sessions", sessions);
+app.route("/api/admin", admin);
 app.route("/api/analyses", analyses);
 
 app.notFound((c) => c.json({ error: "Niet gevonden." }, 404));
@@ -101,4 +104,10 @@ app.onError((error, c) => {
   return c.json({ error: "Er ging iets mis aan de serverkant." }, 500);
 });
 
-export default { fetch: app.fetch };
+export default {
+  fetch: app.fetch,
+  // Dagelijkse opruiming: vergeten sessies worden afgesloten en hun stemmen gewist.
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(endStaleSessions(env));
+  }
+};

@@ -68,6 +68,7 @@ function renderShell(): void {
       h("button", { class: `tab${state.view === "photos" ? " is-active" : ""}`, onclick: () => setView("photos") }, "Foto's"),
       h("button", { class: `tab${state.view === "sessions" ? " is-active" : ""}`, onclick: () => setView("sessions") }, "Sessies"),
       h("span", { class: "grow" }),
+      h("button", { class: "btn btn--ghost", title: "Wist alle foto's, analyses en sessies", onclick: () => void wipeAll() }, "Alles wissen"),
       h("span", { class: "chip", title: "Ingelogd als" }, state.config?.user ?? "")
     ),
     h("div", { class: "layout" }, h("aside", { class: "sidebar", id: "sidebar" }), h("main", { class: "main", id: "main" }))
@@ -399,6 +400,22 @@ async function selectPhoto(id: string | null): Promise<void> {
     renderMain();
   }
   if (id) await loadAnalyses(id);
+}
+
+async function wipeAll(): Promise<void> {
+  const typed = prompt('Dit wist ALLE foto\'s, analyses en sessies, ook uit de opslag. Typ ALLES WISSEN om door te gaan.');
+  if (typed === null) return;
+  try {
+    const r = await api<{ photos: number; sessions: number }>("/api/admin/wipe", { method: "POST", json: { confirm: typed } });
+    toast(`Gewist: ${r.photos} foto's en ${r.sessions} sessies.`, "ok");
+    state.photos = [];
+    state.selectedId = null;
+    state.analyses = [];
+    state.analysisId = null;
+    renderShell();
+  } catch (error) {
+    toast((error as Error).message, "error");
+  }
 }
 
 async function reloadPhotos(selectId: string): Promise<void> {
