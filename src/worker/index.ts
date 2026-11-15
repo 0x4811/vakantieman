@@ -9,6 +9,7 @@ import type { AppContext } from "./env";
 import { PAGE_CSP, SECURITY_HEADERS, withHeaders } from "./http";
 import { analyses } from "./routes/analyses";
 import { photos } from "./routes/photos";
+import { connectSocket, sessions } from "./routes/sessions";
 import type { ProviderId, ConfigDto } from "../shared/types";
 import type { AiBinding } from "./vision/types";
 
@@ -81,7 +82,17 @@ app.get("/api/config", (c) => {
   return c.json(dto);
 });
 
+// WebSocket voor presentatie en bediening. Controleert de herkomst, want browsers sturen
+// bij WebSockets cookies mee naar elke website (Cross-Site WebSocket Hijacking).
+app.get("/ws/:code", async (c) => {
+  if (c.req.header("upgrade") !== "websocket") return c.text("WebSocket vereist.", 426);
+  const origin = c.req.header("origin");
+  if (origin && new URL(origin).host !== new URL(c.req.url).host) return c.text("Niet toegestaan.", 403);
+  return connectSocket(c.env, c.req.param("code").toUpperCase(), c.req.raw, c.req.query("role") ?? "present");
+});
+
 app.route("/api/photos", photos);
+app.route("/api/sessions", sessions);
 app.route("/api/analyses", analyses);
 
 app.notFound((c) => c.json({ error: "Niet gevonden." }, 404));

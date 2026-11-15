@@ -2,6 +2,7 @@
 // Gebruik: npm run e2e   (start eerst: npm run dev)
 
 import assert from "node:assert/strict";
+import { request } from "node:http";
 import { makeJpeg } from "../tests/helpers";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:8787";
@@ -96,6 +97,7 @@ async function main(): Promise<void> {
   });
 
   let analysisId = "";
+  let maskedAnalysisId = "";
   await step("analyse met mock wordt beperkt tot stadsniveau", async () => {
     const r = await api(`/api/photos/${photoId}/analyze?provider=mock`, { method: "POST", body: IMAGE_B64, headers: { "content-type": "text/plain" } });
     assert.equal(r.status, 201, JSON.stringify(r.body));
@@ -161,6 +163,99 @@ async function main(): Promise<void> {
     assert.equal(r.status, 201);
     assert.equal(r.body.variant, "masked");
     assert.ok(r.body.result.overall_confidence < 0.3);
+    maskedAnalysisId = r.body.id;
+  });
+
+  // ---- sessies en live-kamer
+  let sessionId = "";
+  let code = "";
+
+  await step("sessie met niet-goedgekeurde analyse wordt geweigerd", async () => {
+    const fresh = await api(`/api/photos/${photoId}/analyze?provider=mock`, { method: "POST", body: IMAGE_B64 });
+    const r = await api("/api/sessions", { method: "POST", body: JSON.stringify({ photo_id: photoId, analysis_id: fresh.body.id }) });
+    assert.equal(r.status, 409);
+    await api(`/api/analyses/${fresh.body.id}`, { method: "DELETE" });
+  });
+
+  await step("sessie aanmaken met goedgekeurde analyses", async () => {
+    await api(`/api/analyses/${maskedAnalysisId}`, { method: "PATCH", body: JSON.stringify({ approved: true }) });
+    const r = await api("/api/sessions", {
+      method: "POST",
+      body: JSON.stringify({ photo_id: photoId, analysis_id: analysisId, masked_analysis_id: maskedAnalysisId })
+    });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.match(r.body.code, /^[A-HJKMNP-Z2-9]{5}$/);
+    sessionId = r.body.id;
+    code = r.body.code;
+  });
+
+  await step("websocket zonder juiste herkomst wordt geweigerd", async () => {
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = request(`${BASE}/ws/${code}`, {
+        headers: {
+          connection: "Upgrade",
+          upgrade: "websocket",
+          origin: "https://evil.example",
+          "sec-websocket-version": "13",
+          "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ=="
+        }
+      });
+      req.on("response", (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on("upgrade", () => resolve(101));
+      req.on("error", reject);
+      req.end();
+    });
+    assert.equal(status, 403);
+  });
+
+  await step("websocket: snapshot bevat script zonder verborgen aanwijzing en zonder exacte coördinaten", async () => {
+    const ws = new WebSocket(`${BASE.replace("http", "ws")}/ws/${code}?role=control`);
+    const first = await new Promise<any>((resolve, reject) => {
+      ws.onmessage = (e) => resolve(JSON.parse(String(e.data)));
+      ws.onerror = () => reject(new Error("socket fout"));
+      setTimeout(() => reject(new Error("time-out")), 5000);
+    });
+    assert.equal(first.t, "snapshot");
+    assert.equal(first.state.phase, "idle");
+    assert.ok(!first.script.analysis.clues.some((c: any) => c.id === "c5"), "verborgen aanwijzing zit in script");
+    assert.ok(first.script.masked, "masked ontbreekt");
+    assert.equal(first.script.analysis.clues[0].id, "c4", "volgorde niet toegepast");
+    ws.close();
+  });
+
+  await step("bediening: Volgende opent de raadronde en ongeldige acties worden geweigerd", async () => {
+    const ws = new WebSocket(`${BASE.replace("http", "ws")}/ws/${code}?role=control`);
+    const messages: any[] = [];
+    ws.onmessage = (e) => messages.push(JSON.parse(String(e.data)));
+    await new Promise((r) => (ws.onopen = r));
+    const until = async (pred: () => boolean) => {
+      for (let i = 0; i < 100 && !pred(); i++) await new Promise((r) => setTimeout(r, 50));
+      assert.ok(pred(), "verwacht bericht kwam niet");
+    };
+    await until(() => messages.length >= 1);
+    ws.send(JSON.stringify({ t: "action", action: { type: "next" } }));
+    await until(() => messages.some((m) => m.t === "state" && m.state.phase === "guessing" && m.state.votesOpen));
+    ws.send(JSON.stringify({ t: "action", action: { type: "bogus" } }));
+    await until(() => messages.some((m) => m.t === "error"));
+    ws.close();
+  });
+
+  await step("sessie is live in de lijst", async () => {
+    const r = await api("/api/sessions");
+    assert.equal(r.body.find((s: any) => s.id === sessionId).state, "live");
+  });
+
+  await step("vernieuwen van een live sessie vraagt bevestiging", async () => {
+    assert.equal((await api(`/api/sessions/${sessionId}/refresh`, { method: "POST" })).status, 409);
+    assert.equal((await api(`/api/sessions/${sessionId}/refresh?force=1`, { method: "POST" })).status, 200);
+  });
+
+  await step("verwijderen van de sessie", async () => {
+    assert.equal((await api(`/api/sessions/${sessionId}`, { method: "DELETE" })).status, 200);
+    assert.equal((await api(`/api/sessions/${sessionId}`)).status, 404);
   });
 
   await step("verwijderen ruimt alles op", async () => {

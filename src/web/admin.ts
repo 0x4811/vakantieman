@@ -6,6 +6,7 @@ import { $, formatDateTime, h, mount, openModal, toast } from "./dom";
 import { blobToBase64, prepareImage, type PreparedImage } from "./image-tools";
 import { COLORS, DemoMap } from "./map";
 import { photoStage } from "./photo-view";
+import { renderSessions } from "./sessions-view";
 import { formatKm } from "../shared/geo";
 import { placeLabel } from "../shared/levels";
 import {
@@ -31,7 +32,8 @@ const state = {
   analyses: [] as AnalysisDto[],
   analysisId: null as string | null,
   focusClue: null as string | null,
-  running: false
+  running: false,
+  view: "photos" as "photos" | "sessions"
 };
 
 let analysisMap: DemoMap | null = null;
@@ -62,6 +64,8 @@ function renderShell(): void {
       { class: "topbar" },
       h("div", { class: "brand" }, h("i"), "vakantieman"),
       h("span", { class: "muted small" }, "Awareness-demo · alleen eigen selfies"),
+      h("button", { class: `tab${state.view === "photos" ? " is-active" : ""}`, onclick: () => setView("photos") }, "Foto's"),
+      h("button", { class: `tab${state.view === "sessions" ? " is-active" : ""}`, onclick: () => setView("sessions") }, "Sessies"),
       h("span", { class: "grow" }),
       h("span", { class: "chip", title: "Ingelogd als" }, state.config?.user ?? "")
     ),
@@ -100,9 +104,18 @@ function renderSidebar(): void {
   );
 }
 
+function setView(view: "photos" | "sessions"): void {
+  state.view = view;
+  renderShell();
+}
+
 function renderMain(): void {
   destroyMap();
   const main = $("#main");
+  if (state.view === "sessions") {
+    void renderSessions(main, state.photos);
+    return;
+  }
   const photo = selectedPhoto();
   if (!photo) {
     mount(main, h("div", { class: "empty" }, "Kies links een foto of upload een nieuwe."));
@@ -376,8 +389,13 @@ async function selectPhoto(id: string | null): Promise<void> {
   state.analyses = [];
   state.analysisId = null;
   state.focusClue = null;
-  renderSidebar();
-  renderMain();
+  if (state.view !== "photos") {
+    state.view = "photos";
+    renderShell();
+  } else {
+    renderSidebar();
+    renderMain();
+  }
   if (id) await loadAnalyses(id);
 }
 

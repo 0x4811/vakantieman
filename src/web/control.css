@@ -1,0 +1,21 @@
+/* Bediening op de telefoon */
+body.control { padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+#app { max-width: 560px; margin: 0 auto; display: grid; gap: 14px; padding: 14px 0 28px; }
+.c-wait { text-align: center; padding: 60px 0; display: grid; gap: 8px; }
+.c-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.c-phase { font-size: 28px; font-weight: 750; letter-spacing: -.01em; }
+.c-conn { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); }
+.dot--on { background: var(--ok); }
+.c-notes { padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); font-size: 17px; line-height: 1.4; min-height: 84px; }
+.c-stats { display: flex; justify-content: space-between; font-size: 18px; color: var(--muted); }
+.c-stats b { color: var(--text); font-size: 22px; }
+.c-nav { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.c-nav .btn { min-height: 92px; font-size: 22px; border-radius: 16px; }
+.c-jump { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 42px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); cursor: pointer; }
+.chip.is-active { background: var(--accent-2); color: #1a1403; border-color: var(--accent-2); font-weight: 650; }
+.chip:disabled { opacity: .5; }
+.c-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.c-row .btn { min-height: 52px; }
+.c-danger { margin-top: 10px; }
