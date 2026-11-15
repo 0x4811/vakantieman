@@ -19,7 +19,12 @@ const app = new Hono<AppContext>();
 // Beveiligingskoppen op alle antwoorden.
 app.use("*", async (c, next) => {
   await next();
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) c.res.headers.set(name, value);
+  // Antwoorden van ASSETS.fetch hebben onveranderlijke headers, dus eerst kopiëren.
+  // WebSocket-upgrades (101) blijven ongemoeid, anders gaat de socket verloren.
+  if (c.res.status === 101) return;
+  const res = new Response(c.res.body, c.res);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) res.headers.set(name, value);
+  c.res = res;
 });
 
 app.get("/healthz", (c) => c.text("ok"));
