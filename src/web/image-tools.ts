@@ -23,7 +23,7 @@ export function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+export function canvasToJpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("Coderen van de foto mislukte."))), "image/jpeg", quality);
   });

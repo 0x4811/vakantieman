@@ -7,6 +7,7 @@ import { blobToBase64, prepareImage, type PreparedImage } from "./image-tools";
 import { COLORS, DemoMap } from "./map";
 import { photoStage } from "./photo-view";
 import { renderSessions } from "./sessions-view";
+import { openMaskEditor } from "./mask-editor";
 import { formatKm } from "../shared/geo";
 import { placeLabel } from "../shared/levels";
 import {
@@ -145,6 +146,7 @@ function photoHeader(photo: PhotoDto): HTMLElement {
     h(
       "div",
       { class: "row" },
+      h("button", { class: "btn", onclick: () => openMaskEditor(photo, state.analyses.find((a) => a.variant === "original" && a.approved) ?? state.analyses.find((a) => a.variant === "original") ?? null, () => void reloadPhotos(photo.id)) }, photo.has_masked ? "Onzichtbaar maken (opnieuw)" : "Onzichtbaar maken"),
       h("button", { class: "btn", onclick: () => openEditModal(photo) }, "Bewerken"),
       h("button", { class: "btn btn--danger", onclick: () => void deletePhoto(photo) }, "Verwijderen")
     )
@@ -397,6 +399,15 @@ async function selectPhoto(id: string | null): Promise<void> {
     renderMain();
   }
   if (id) await loadAnalyses(id);
+}
+
+async function reloadPhotos(selectId: string): Promise<void> {
+  try {
+    state.photos = await api<PhotoDto[]>("/api/photos");
+    await selectPhoto(selectId);
+  } catch (error) {
+    toast((error as Error).message, "error");
+  }
 }
 
 async function loadAnalyses(photoId: string): Promise<void> {
