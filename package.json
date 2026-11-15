@@ -1,0 +1,39 @@
+{
+  "name": "vakantieman",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "description": "Awareness-demo: het publiek raadt waar Wouter op een selfie is, daarna toont een beeldmodel hoe de plek af te leiden is.",
+  "scripts": {
+    "dev": "npm run build:web && wrangler dev",
+    "build": "npm run build:web",
+    "build:web": "vite build && vite build --config vite.offline.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "bench": "tsx scripts/bench.ts",
+    "deploy": "npm run build && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "e2e": "tsx scripts/e2e.ts"
+  },
+  "dependencies": {
+    "hono": "^4.13.18",
+    "maplibre-gl": "^6.18.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261114.1",
+    "@types/geojson": "^7946.0.16",
+    "@types/node": "^26.6.6",
+    "@types/qrcode": "^1.5.6",
+    "@types/topojson-client": "^3.1.5",
+    "topojson-client": "^3.1.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.1.0",
+    "world-atlas": "^2.0.2",
+    "wrangler": "^4.162.0"
+  }
+}

@@ -16,3 +16,8 @@ dist/
 # Systeembestanden
 .DS_Store
 Thumbs.db
+
+# Lokale uitvoer
+/bench-output/
+/docs/bench/*.json
+/.wrangler/

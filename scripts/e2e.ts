@@ -1,0 +1,180 @@
+// End-to-end-test tegen een draaiende `wrangler dev` (standaard http://localhost:8787).
+// Gebruik: npm run e2e   (start eerst: npm run dev)
+
+import assert from "node:assert/strict";
+import { makeJpeg } from "../tests/helpers";
+
+const BASE = process.env.BASE_URL ?? "http://localhost:8787";
+const VOTE = process.env.VOTE_URL ?? "http://localhost:8788";
+const H = { "x-requested-with": "vakantieman" };
+
+let passed = 0;
+async function step(name: string, fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+    passed++;
+    console.log(`  ok   ${name}`);
+  } catch (error) {
+    console.error(`  FOUT ${name}\n       ${(error as Error).message}`);
+    process.exitCode = 1;
+    throw error;
+  }
+}
+
+async function api<T = any>(path: string, init: RequestInit & { headers?: Record<string, string> } = {}): Promise<{ status: number; body: T }> {
+  const method = init.method ?? "GET";
+  const headers = { ...(method === "GET" ? {} : H), ...(init.headers ?? {}) };
+  const res = await fetch(BASE + path, { ...init, headers });
+  const text = await res.text();
+  let body: any = text;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // geen JSON
+  }
+  return { status: res.status, body };
+}
+
+const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64");
+const jpegBytes = makeJpeg({ width: 1200, height: 800 });
+const IMAGE_B64 = b64(new Uint8Array(900).fill(7)); // lang genoeg voor de base64-controle (geen echt beeld nodig voor de mock)
+
+async function main(): Promise<void> {
+  console.log(`E2E tegen ${BASE}`);
+
+  await step("healthz is open", async () => {
+    const r = await fetch(BASE + "/healthz");
+    assert.equal(r.status, 200);
+  });
+
+  await step("config toont providers en de mock is beschikbaar", async () => {
+    const r = await api("/api/config");
+    assert.equal(r.status, 200);
+    assert.equal(r.body.default_provider, "mock");
+    assert.ok(r.body.providers.find((p: any) => p.id === "mock" && p.available));
+    assert.equal(r.body.providers.find((p: any) => p.id === "claude").available, false);
+  });
+
+  await step("wijzigende aanvragen zonder CSRF-header worden geweigerd", async () => {
+    const res = await fetch(BASE + "/api/photos", { method: "POST", body: jpegBytes });
+    assert.equal(res.status, 403);
+  });
+
+  let photoId = "";
+  await step("upload met EXIF wordt geweigerd", async () => {
+    const dirty = makeJpeg({ exif: true });
+    const r = await api("/api/photos?label=x&place=Antwerpen&lat=51.2&lon=4.4&level=city&sensitivity=public", { method: "POST", body: dirty });
+    assert.equal(r.status, 422);
+    assert.match(r.body.error, /metadata/i);
+  });
+
+  await step("upload met ongeldige gegevens wordt geweigerd", async () => {
+    assert.equal((await api("/api/photos?label=&place=A&lat=51&lon=4&level=city&sensitivity=public", { method: "POST", body: jpegBytes })).status, 400);
+    assert.equal((await api("/api/photos?label=x&place=A&lat=999&lon=4&level=city&sensitivity=public", { method: "POST", body: jpegBytes })).status, 400);
+    assert.equal((await api("/api/photos?label=x&place=A&lat=51&lon=4&level=huis&sensitivity=public", { method: "POST", body: jpegBytes })).status, 400);
+  });
+
+  await step("schone upload slaagt", async () => {
+    const r = await api("/api/photos?label=Testselfie&place=Antwerpen,%20Belgi%C3%AB&lat=51.21254&lon=4.39521&level=city&sensitivity=private", {
+      method: "POST",
+      body: jpegBytes
+    });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(r.body.width, 1200);
+    assert.equal(r.body.height, 800);
+    assert.equal(r.body.reveal_level, "city");
+    photoId = r.body.id;
+  });
+
+  await step("foto staat in de lijst en het beeld is op te halen", async () => {
+    const list = await api("/api/photos");
+    assert.ok(list.body.some((p: any) => p.id === photoId));
+    const img = await fetch(`${BASE}/api/photos/${photoId}/image`);
+    assert.equal(img.status, 200);
+    assert.equal(img.headers.get("content-type"), "image/jpeg");
+    assert.equal((await img.arrayBuffer()).byteLength, jpegBytes.length);
+  });
+
+  let analysisId = "";
+  await step("analyse met mock wordt beperkt tot stadsniveau", async () => {
+    const r = await api(`/api/photos/${photoId}/analyze?provider=mock`, { method: "POST", body: IMAGE_B64, headers: { "content-type": "text/plain" } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    analysisId = r.body.id;
+    const cand = r.body.result.candidates[0];
+    assert.equal(cand.city, "Antwerpen");
+    assert.equal(cand.district, "");
+    assert.equal(cand.street, "");
+    assert.equal(cand.lat, 51.2); // afgerond op 0,1 graad
+    assert.ok(cand.radius_km >= 10);
+    const all = JSON.stringify(r.body.result);
+    assert.ok(!/Leopold/i.test(all), "straatnaam lekt in de opgeslagen analyse");
+    assert.equal(r.body.approved, false);
+    assert.equal(r.body.provider, "mock");
+  });
+
+  await step("privéfoto mag niet naar gemini, en claude zonder sleutel geeft 503", async () => {
+    const g = await api(`/api/photos/${photoId}/analyze?provider=gemini`, { method: "POST", body: IMAGE_B64 });
+    assert.equal(g.status, 403);
+    const c = await api(`/api/photos/${photoId}/analyze?provider=claude`, { method: "POST", body: IMAGE_B64 });
+    assert.equal(c.status, 503);
+    assert.match(c.body.error, /ANTHROPIC_API_KEY/);
+  });
+
+  await step("analyse zonder base64-body wordt geweigerd", async () => {
+    const r = await api(`/api/photos/${photoId}/analyze?provider=mock`, { method: "POST", body: "kort" });
+    assert.equal(r.status, 400);
+  });
+
+  await step("goedkeuren en onderdelen verbergen", async () => {
+    const r = await api(`/api/analyses/${analysisId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ approved: true, hidden_clue_ids: ["c5"], clue_order: ["c4", "c3", "c2", "c1", "c5"] })
+    });
+    assert.equal(r.status, 200);
+    assert.equal(r.body.approved, true);
+    assert.equal(r.body.result.clues[0].id, "c4");
+    assert.equal(r.body.result.clues.find((c: any) => c.id === "c5").hidden, true);
+  });
+
+  await step("grover detailniveau werkt terug op bestaande analyses", async () => {
+    const p = await api(`/api/photos/${photoId}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ reveal_level: "country" }) });
+    assert.equal(p.status, 200);
+    const a = await api(`/api/analyses/${analysisId}`);
+    assert.equal(a.body.result.candidates[0].city, "");
+    assert.equal(a.body.result.candidates[0].lat, 51);
+    assert.ok(!/Antwerpen/i.test(JSON.stringify(a.body.result)), "stadsnaam staat nog in de analyse");
+  });
+
+  await step("bewerkte foto: andere afmetingen worden geweigerd, juiste afmetingen slagen", async () => {
+    const wrong = await api(`/api/photos/${photoId}/masked`, { method: "PUT", body: makeJpeg({ width: 10, height: 10 }) });
+    assert.equal(wrong.status, 422);
+    const ok = await api(`/api/photos/${photoId}/masked`, { method: "PUT", body: makeJpeg({ width: 1200, height: 800 }) });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.has_masked, true);
+    const img = await fetch(`${BASE}/api/photos/${photoId}/image?variant=masked`);
+    assert.equal(img.status, 200);
+  });
+
+  await step("analyse van de bewerkte variant geeft een onzekere uitkomst", async () => {
+    const r = await api(`/api/photos/${photoId}/analyze?provider=mock&variant=masked`, { method: "POST", body: IMAGE_B64 });
+    assert.equal(r.status, 201);
+    assert.equal(r.body.variant, "masked");
+    assert.ok(r.body.result.overall_confidence < 0.3);
+  });
+
+  await step("verwijderen ruimt alles op", async () => {
+    const del = await api(`/api/photos/${photoId}`, { method: "DELETE" });
+    assert.equal(del.status, 200);
+    assert.equal((await api(`/api/photos/${photoId}`)).status, 404);
+    assert.equal((await api(`/api/analyses/${analysisId}`)).status, 404);
+    assert.equal((await fetch(`${BASE}/api/photos/${photoId}/image`)).status, 404);
+  });
+
+  console.log(`\n${passed} stappen geslaagd.`);
+  void VOTE;
+}
+
+main().catch(() => {
+  process.exitCode = 1;
+});

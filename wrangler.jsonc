@@ -1,0 +1,44 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vakantieman",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./dist/web",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "vakantieman",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "PHOTOS", "bucket_name": "vakantieman-photos" }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "SESSIONS", "class_name": "SessionRoom" }]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["SessionRoom"] }
+  ],
+  "triggers": { "crons": ["17 3 * * *"] },
+  "vars": {
+    // Welke vision-provider standaard wordt gebruikt: claude | gemini | workers-ai | mock
+    "VISION_PROVIDER": "mock",
+    // Leeg = standaardmodel van de gekozen provider
+    "VISION_MODEL": "",
+    // Provider die het beheerscherm als terugval aanbiedt
+    "VISION_FALLBACK": "mock",
+    // Providers die foto's met gevoeligheid "private" mogen ontvangen (kommagescheiden)
+    "PRIVATE_PROVIDERS": "claude,mock",
+    // Pas invullen na het inrichten van Cloudflare Access (zie docs/INRICHTING.md)
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": ""
+  },
+  "observability": { "enabled": true }
+}

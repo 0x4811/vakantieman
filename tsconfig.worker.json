@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["@cloudflare/workers-types"]
+  },
+  "files": [],
+  "include": ["src/worker/**/*.ts", "src/shared/**/*.ts"]
+}

@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  "files": [],
+  "include": [
+    "src/shared/**/*.ts",
+    "src/worker/vision/**/*.ts",
+    "src/worker/auth.ts",
+    "src/worker/jpeg.ts",
+    "tests/**/*.ts",
+    "scripts/**/*.ts",
+    "vitest.config.ts"
+  ]
+}

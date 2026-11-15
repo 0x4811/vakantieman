@@ -1,0 +1,20 @@
+# Kopieer naar .dev.vars (staat in .gitignore) en vul in. Nooit committen.
+
+# Alleen voor lokale ontwikkeling: slaat de Access-controle over.
+# De Worker weigert deze schakelaar zodra ACCESS_AUD is ingesteld.
+DEV_AUTH_BYPASS=1
+
+# Provider kiezen: claude | gemini | workers-ai | mock
+VISION_PROVIDER=mock
+# VISION_MODEL=claude-sonnet-5-5
+
+# Sleutels (pas nodig bij echte analyses)
+# ANTHROPIC_API_KEY=
+# GEMINI_API_KEY=
+
+# Alleen als je een betaald Gemini-project gebruikt (gegevens niet voor training):
+# GEMINI_PAID=true
+
+# Workers AI via REST (alleen voor het bench-script; in de Worker gebruikt het de AI-binding)
+# CF_ACCOUNT_ID=
+# CF_API_TOKEN=
